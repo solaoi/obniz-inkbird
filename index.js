@@ -10,6 +10,7 @@ const {
   FIRESTORE_MEASUREMENT_ID,
   FIRESTORE_COLLECTION_ID,
   FIRESTORE_MESSAGING_SENDER_ID,
+  FIRESTORE_COLLECTION_ID_FIXED,
 } = process.env;
 const INTERVAL = 10 * 1000; // 10秒おきにスキャン
 const BUTTON_RESET = 10 * 1000; // 10秒でボタンをリセット
@@ -106,8 +107,8 @@ let buttonStatus = false;
 obniz.onconnect = async function () {
   obniz.buttonA.onchange = (pressed) => {
     if (sensorId && pressed && !buttonStatus) {
-      db.collection(FIRESTORE_COLLECTION_ID)
-        .doc(sensorId)
+      const sensorRef = db.collection(FIRESTORE_COLLECTION_ID).doc(sensorId);
+      sensorRef
         .update({ pressed: true })
         .then(() => {
           console.log("ButtonStatus updated");
@@ -130,6 +131,27 @@ obniz.onconnect = async function () {
         .catch((e) => {
           console.log(e);
         });
+
+      // udpate fixed
+      sensorRef
+        .get()
+        .then((doc) => {
+          if (!doc.exists) {
+            console.log("data is none");
+          } else {
+            const { temperature, humidity, battery } = doc.data();
+            db.collection(FIRESTORE_COLLECTION_ID_FIXED)
+              .doc(sensorId)
+              .set({ temperature, humidity, battery })
+              .then(() => {
+                console.log("SensorFixed updated");
+              })
+              .catch((e) => {
+                console.log(e);
+              });
+          }
+        })
+        .catch((e) => console.log(e));
     }
   };
 };
