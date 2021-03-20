@@ -4,14 +4,35 @@ const {
   OBNIZ_ID,
   AMBIENT_CHANNEL_ID,
   AMBIENT_WRITE_KEY,
+  FIRESTORE_API_KEY,
+  FIRESTORE_APP_ID,
+  FIRESTORE_PROJECT_ID,
+  FIRESTORE_MEASUREMENT_ID,
+  FIRESTORE_COLLECTION_ID,
+  FIRESTORE_MESSAGING_SENDER_ID,
 } = process.env;
 const INTERVAL = 10 * 1000; //10秒おきにスキャン
 
 const obnizNoble = require("obniz-noble");
 const ambient = require("ambient-lib");
 
+const firebase = require("firebase/app");
+require("firebase/auth");
+require("firebase/firestore");
+
 const noble = obnizNoble(OBNIZ_ID, { access_token: OBNIZ_ACCESS_TOKEN });
 ambient.connect(AMBIENT_CHANNEL_ID, AMBIENT_WRITE_KEY);
+const app = firebase.initializeApp({
+  apiKey: FIRESTORE_API_KEY,
+  authDomain: `${FIRESTORE_PROJECT_ID}.firebaseapp.com`,
+  appId: FIRESTORE_APP_ID,
+  projectId: FIRESTORE_PROJECT_ID,
+  storageBucket: `${FIRESTORE_PROJECT_ID}.appspot.com`,
+  messagingSenderId: FIRESTORE_MESSAGING_SENDER_ID,
+  measurementId: FIRESTORE_MEASUREMENT_ID,
+  databaseURL: `https://${FIRESTORE_PROJECT_ID}.firebaseio.com`,
+});
+const db = app.firestore();
 
 noble.on("stateChange", function (state) {
   if (state === "poweredOn") {
@@ -50,6 +71,21 @@ noble.on("discover", function (peripheral) {
       }
       console.log(`AmbientRespose is: ${res ? res.statusCode : "unknown"}`);
     });
+    const data = {
+      temperature: t,
+      humidity: h,
+      battery: b,
+    };
+    const sensorId = peripheral.address ?? "dummyId";
+    db.collection(FIRESTORE_COLLECTION_ID)
+      .doc(sensorId)
+      .set(data)
+      .then(() => {
+        console.log("Frank created");
+      })
+      .catch((e) => {
+        console.log(e);
+      });
     noble.stopScanning();
   }
 });
