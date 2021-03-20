@@ -76,7 +76,7 @@ noble.on("discover", function (peripheral) {
       humidity: h,
       battery: b,
     };
-    const sensorId = peripheral.address ?? "dummyId";
+    const sensorId = peripheral.address ? peripheral.address : "dummyId";
     db.collection(FIRESTORE_COLLECTION_ID)
       .doc(sensorId)
       .set(data)
