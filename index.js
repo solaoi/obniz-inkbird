@@ -11,7 +11,8 @@ const {
   FIRESTORE_COLLECTION_ID,
   FIRESTORE_MESSAGING_SENDER_ID,
 } = process.env;
-const INTERVAL = 10 * 1000; //10秒おきにスキャン
+const INTERVAL = 10 * 1000; // 10秒おきにスキャン
+const BUTTON_RESET = 10 * 1000; // 10秒でボタンをリセット
 
 const obnizNoble = require("obniz-noble");
 const ambient = require("ambient-lib");
@@ -20,7 +21,12 @@ const firebase = require("firebase/app");
 require("firebase/auth");
 require("firebase/firestore");
 
+// hmm... 2 connection:<
+// if you use noble and defalut obniz
 const noble = obnizNoble(OBNIZ_ID, { access_token: OBNIZ_ACCESS_TOKEN });
+const obniz = new obnizNoble.Obniz.M5StickC(OBNIZ_ID, {
+  access_token: OBNIZ_ACCESS_TOKEN,
+});
 ambient.connect(AMBIENT_CHANNEL_ID, AMBIENT_WRITE_KEY);
 const app = firebase.initializeApp({
   apiKey: FIRESTORE_API_KEY,
@@ -76,10 +82,10 @@ noble.on("discover", function (peripheral) {
       humidity: h,
       battery: b,
     };
-    const sensorId = peripheral.address ? peripheral.address : "dummyId";
+    sensorId = peripheral.address ? peripheral.address : "dummyId";
     db.collection(FIRESTORE_COLLECTION_ID)
       .doc(sensorId)
-      .set(data)
+      .update(data)
       .then(() => {
         console.log("Frank created");
       })
@@ -94,3 +100,36 @@ setInterval(function () {
   console.log("Start scanning..");
   noble.startScanning();
 }, INTERVAL);
+
+let sensorId;
+let buttonStatus = false;
+obniz.onconnect = async function () {
+  obniz.buttonA.onchange = (pressed) => {
+    if (sensorId && pressed && !buttonStatus) {
+      db.collection(FIRESTORE_COLLECTION_ID)
+        .doc(sensorId)
+        .update({ pressed: true })
+        .then(() => {
+          console.log("ButtonStatus updated");
+          buttonStatus = true;
+          setTimeout(function () {
+            if (buttonStatus) {
+              db.collection(FIRESTORE_COLLECTION_ID)
+                .doc(sensorId)
+                .update({ pressed: false })
+                .then(() => {
+                  console.log("ButtonStatus reseted");
+                  buttonStatus = false;
+                })
+                .catch((e) => {
+                  console.log(e);
+                });
+            }
+          }, BUTTON_RESET);
+        })
+        .catch((e) => {
+          console.log(e);
+        });
+    }
+  };
+};
